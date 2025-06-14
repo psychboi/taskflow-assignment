@@ -1,6 +1,6 @@
 // Individual Task Entity Class
 class TaskEntity {
-  constructor(title, description = "", priority = "medium", category = "personal") {
+  constructor(title, description = "", priority = "medium", category = "personal", dueDate = null, dueTime = null) {
     this.taskId = this.generateUniqueId()
     this.title = title
     this.description = description
@@ -9,6 +9,8 @@ class TaskEntity {
     this.isCompleted = false
     this.creationTimestamp = new Date()
     this.lastModified = new Date()
+    this.dueDate = dueDate
+    this.dueTime = dueTime
   }
 
   generateUniqueId() {
@@ -16,7 +18,7 @@ class TaskEntity {
   }
 
   modifyTask(updatedData) {
-    const allowedFields = ["title", "description", "priority", "category"]
+    const allowedFields = ["title", "description", "priority", "category", "dueDate", "dueTime"]
     allowedFields.forEach((field) => {
       if (updatedData.hasOwnProperty(field)) {
         this[field] = updatedData[field]
@@ -35,12 +37,83 @@ class TaskEntity {
     return this.title.toLowerCase().includes(query) || this.description.toLowerCase().includes(query)
   }
 
-  getFormattedDate() {
+  getFormattedCreationDate() {
     return this.creationTimestamp.toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
       year: "numeric",
     })
+  }
+
+  getFormattedDueDate() {
+    if (!this.dueDate) return null
+
+    const dueDateTime = new Date(this.dueDate)
+    if (this.dueTime) {
+      const [hours, minutes] = this.dueTime.split(":")
+      dueDateTime.setHours(Number.parseInt(hours), Number.parseInt(minutes))
+    }
+
+    return dueDateTime.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      ...(this.dueTime && {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    })
+  }
+
+  getDueDateObject() {
+    if (!this.dueDate) return null
+
+    const dueDateTime = new Date(this.dueDate)
+    if (this.dueTime) {
+      const [hours, minutes] = this.dueTime.split(":")
+      dueDateTime.setHours(Number.parseInt(hours), Number.parseInt(minutes))
+    } else {
+      dueDateTime.setHours(23, 59, 59) // End of day if no time specified
+    }
+
+    return dueDateTime
+  }
+
+  isOverdue() {
+    if (!this.dueDate || this.isCompleted) return false
+    const dueDateObj = this.getDueDateObject()
+    return dueDateObj && new Date() > dueDateObj
+  }
+
+  isDueToday() {
+    if (!this.dueDate || this.isCompleted) return false
+    const dueDateObj = this.getDueDateObject()
+    if (!dueDateObj) return false
+
+    const today = new Date()
+    return (
+      dueDateObj.getDate() === today.getDate() &&
+      dueDateObj.getMonth() === today.getMonth() &&
+      dueDateObj.getFullYear() === today.getFullYear()
+    )
+  }
+
+  isDueSoon() {
+    if (!this.dueDate || this.isCompleted) return false
+    const dueDateObj = this.getDueDateObject()
+    if (!dueDateObj) return false
+
+    const today = new Date()
+    const threeDaysFromNow = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000)
+    return dueDateObj > today && dueDateObj <= threeDaysFromNow
+  }
+
+  getDueDateStatus() {
+    if (!this.dueDate || this.isCompleted) return null
+    if (this.isOverdue()) return "overdue"
+    if (this.isDueToday()) return "today"
+    if (this.isDueSoon()) return "upcoming"
+    return "normal"
   }
 }
 
@@ -57,10 +130,18 @@ class TaskManagementSystem {
     this.currentEditingId = null
     this.sortMethod = "priority"
     this.initializeFromStorage()
+    this.startOverdueChecker()
   }
 
   createNewTask(taskData, showNotification = true) {
-    const newTask = new TaskEntity(taskData.title, taskData.description, taskData.priority, taskData.category)
+    const newTask = new TaskEntity(
+      taskData.title,
+      taskData.description,
+      taskData.priority,
+      taskData.category,
+      taskData.dueDate || null,
+      taskData.dueTime || null,
+    )
 
     this.taskCollection.push(newTask)
     this.persistToStorage()
@@ -74,6 +155,19 @@ class TaskManagementSystem {
           this.displayAlert(`⚠️ High priority task "${newTask.title}" needs attention!`, "warning")
         }, 1500)
       }
+
+      // Due date notifications
+      if (newTask.dueDate) {
+        if (newTask.isDueToday()) {
+          setTimeout(() => {
+            this.displayAlert(`📅 Task "${newTask.title}" is due today!`, "warning")
+          }, 2000)
+        } else if (newTask.isDueSoon()) {
+          setTimeout(() => {
+            this.displayAlert(`⏰ Task "${newTask.title}" is due soon!`, "info")
+          }, 2000)
+        }
+      }
     }
 
     return newTask
@@ -83,6 +177,7 @@ class TaskManagementSystem {
     const targetTask = this.findTaskById(taskId)
     if (targetTask) {
       const previousPriority = targetTask.priority
+      const previousDueDate = targetTask.dueDate
       targetTask.modifyTask(updatedData)
       this.persistToStorage()
       this.displayAlert(`Task "${targetTask.title}" updated successfully!`, "success")
@@ -94,11 +189,17 @@ class TaskManagementSystem {
         }, 1500)
       }
 
-      // Show notification if task was updated to high priority
-      if (targetTask.priority === "high" && previousPriority !== "high") {
-        setTimeout(() => {
-          this.displayAlert(`⚠️ High priority task "${targetTask.title}" requires immediate attention!`, "error")
-        }, 2500)
+      // Due date change notifications
+      if (!previousDueDate && targetTask.dueDate) {
+        if (targetTask.isDueToday()) {
+          setTimeout(() => {
+            this.displayAlert(`📅 Task "${targetTask.title}" is due today!`, "warning")
+          }, 2000)
+        } else if (targetTask.isDueSoon()) {
+          setTimeout(() => {
+            this.displayAlert(`⏰ Task "${targetTask.title}" is due soon!`, "info")
+          }, 2000)
+        }
       }
 
       return targetTask
@@ -135,15 +236,28 @@ class TaskManagementSystem {
             this.displayAlert(`🎉 High priority task "${targetTask.title}" completed! Excellent work!`, "success")
           }, 1500)
         }
+
+        // Overdue task completion
+        if (targetTask.isOverdue()) {
+          setTimeout(() => {
+            this.displayAlert(`✅ Overdue task "${targetTask.title}" finally completed!`, "success")
+          }, 1500)
+        }
       } else {
         // Task reactivated
         this.displayAlert(`Task "${targetTask.title}" reactivated!`, "info")
 
-        // Show high priority alert if reactivating a high priority task
+        // Show alerts for reactivated tasks
         if (targetTask.priority === "high") {
           setTimeout(() => {
             this.displayAlert(`⚠️ High priority task "${targetTask.title}" is now active again!`, "warning")
           }, 1500)
+        }
+
+        if (targetTask.isOverdue()) {
+          setTimeout(() => {
+            this.displayAlert(`🚨 Task "${targetTask.title}" is overdue!`, "error")
+          }, 2000)
         }
       }
 
@@ -172,6 +286,7 @@ class TaskManagementSystem {
       if (this.filterCriteria.status !== "all") {
         if (this.filterCriteria.status === "completed" && !task.isCompleted) return false
         if (this.filterCriteria.status === "pending" && task.isCompleted) return false
+        if (this.filterCriteria.status === "overdue" && !task.isOverdue()) return false
       }
 
       // Search filtering
@@ -196,6 +311,17 @@ class TaskManagementSystem {
       })
     } else if (this.sortMethod === "date") {
       return tasks.sort((a, b) => new Date(b.creationTimestamp) - new Date(a.creationTimestamp))
+    } else if (this.sortMethod === "dueDate") {
+      return tasks.sort((a, b) => {
+        // Tasks without due dates go to the end
+        if (!a.dueDate && !b.dueDate) return new Date(b.creationTimestamp) - new Date(a.creationTimestamp)
+        if (!a.dueDate) return 1
+        if (!b.dueDate) return -1
+
+        const dueDateA = a.getDueDateObject()
+        const dueDateB = b.getDueDateObject()
+        return dueDateA - dueDateB
+      })
     }
     return tasks
   }
@@ -224,14 +350,41 @@ class TaskManagementSystem {
     const totalTasks = this.taskCollection.length
     const completedTasks = this.taskCollection.filter((task) => task.isCompleted).length
     const activeTasks = totalTasks - completedTasks
-    const highPriorityTasks = this.taskCollection.filter((task) => task.priority === "high" && !task.isCompleted).length
+    const overdueTasks = this.taskCollection.filter((task) => task.isOverdue()).length
 
     return {
       total: totalTasks,
       active: activeTasks,
       completed: completedTasks,
-      highPriority: highPriorityTasks,
+      overdue: overdueTasks,
     }
+  }
+
+  startOverdueChecker() {
+    // Check for overdue tasks every minute
+    setInterval(() => {
+      this.checkOverdueTasks()
+    }, 60000) // 60 seconds
+
+    // Initial check
+    setTimeout(() => {
+      this.checkOverdueTasks()
+    }, 5000) // Check after 5 seconds on load
+  }
+
+  checkOverdueTasks() {
+    const overdueTasks = this.taskCollection.filter((task) => task.isOverdue())
+    const newlyOverdue = overdueTasks.filter((task) => {
+      // Check if this task just became overdue (within the last minute)
+      const dueDateObj = task.getDueDateObject()
+      const now = new Date()
+      const oneMinuteAgo = new Date(now.getTime() - 60000)
+      return dueDateObj >= oneMinuteAgo && dueDateObj <= now
+    })
+
+    newlyOverdue.forEach((task) => {
+      this.displayAlert(`🚨 Task "${task.title}" is now overdue!`, "error")
+    })
   }
 
   persistToStorage() {
@@ -243,7 +396,14 @@ class TaskManagementSystem {
     if (storedData) {
       const parsedTasks = JSON.parse(storedData)
       this.taskCollection = parsedTasks.map((taskData) => {
-        const task = new TaskEntity(taskData.title, taskData.description, taskData.priority, taskData.category)
+        const task = new TaskEntity(
+          taskData.title,
+          taskData.description,
+          taskData.priority,
+          taskData.category,
+          taskData.dueDate,
+          taskData.dueTime,
+        )
         task.taskId = taskData.taskId
         task.isCompleted = taskData.isCompleted
         task.creationTimestamp = new Date(taskData.creationTimestamp)
@@ -311,6 +471,8 @@ class UIController {
     this.descriptionField = document.getElementById("taskDescription")
     this.priorityField = document.getElementById("taskPriority")
     this.categoryField = document.getElementById("taskCategory")
+    this.dueDateField = document.getElementById("taskDueDate")
+    this.dueTimeField = document.getElementById("taskDueTime")
     this.submitButton = document.getElementById("submitTaskBtn")
     this.titleValidation = document.getElementById("titleValidation")
 
@@ -330,6 +492,7 @@ class UIController {
     this.totalCountEl = document.getElementById("totalCount")
     this.activeCountEl = document.getElementById("activeCount")
     this.doneCountEl = document.getElementById("doneCount")
+    this.overdueCountEl = document.getElementById("overdueCount")
 
     // Filter elements
     this.categoryFilters = document.querySelectorAll(".filter-btn")
@@ -362,6 +525,7 @@ class UIController {
     // Sorting
     document.getElementById("sortByPriority").addEventListener("click", () => this.handleSorting("priority"))
     document.getElementById("sortByDate").addEventListener("click", () => this.handleSorting("date"))
+    document.getElementById("sortByDueDate").addEventListener("click", () => this.handleSorting("dueDate"))
 
     // Other actions
     this.clearCompletedButton.addEventListener("click", () => this.handleClearCompleted())
@@ -399,6 +563,8 @@ class UIController {
       description: formData.get("description").trim(),
       priority: formData.get("priority"),
       category: formData.get("category"),
+      dueDate: formData.get("dueDate") || null,
+      dueTime: formData.get("dueTime") || null,
     }
 
     if (this.taskSystem.currentEditingId) {
@@ -473,7 +639,10 @@ class UIController {
 
     // Update active sort button
     this.sortButtons.forEach((btn) => btn.classList.remove("active"))
-    document.getElementById(`sortBy${method.charAt(0).toUpperCase() + method.slice(1)}`).classList.add("active")
+    const activeButton = document.getElementById(`sortBy${method.charAt(0).toUpperCase() + method.slice(1)}`)
+    if (activeButton) {
+      activeButton.classList.add("active")
+    }
   }
 
   updateActiveFilter(filterButtons, activeButton) {
@@ -507,6 +676,8 @@ class UIController {
     this.descriptionField.value = task.description
     this.priorityField.value = task.priority
     this.categoryField.value = task.category
+    this.dueDateField.value = task.dueDate || ""
+    this.dueTimeField.value = task.dueTime || ""
   }
 
   closeTaskForm() {
@@ -576,6 +747,7 @@ class UIController {
     this.totalCountEl.textContent = stats.total
     this.activeCountEl.textContent = stats.active
     this.doneCountEl.textContent = stats.completed
+    this.overdueCountEl.textContent = stats.overdue
   }
 
   updateSectionTitle() {
@@ -617,11 +789,24 @@ class UIController {
 
   generateTaskCardHTML(task) {
     const completedClass = task.isCompleted ? "completed" : ""
+    const overdueClass = task.isOverdue() ? "overdue" : ""
     const priorityClass = task.priority
     const categoryClass = task.category
 
+    // Generate date information
+    const createdDate = task.getFormattedCreationDate()
+    const dueDate = task.getFormattedDueDate()
+    const dueDateStatus = task.getDueDateStatus()
+
+    let dueDateHTML = ""
+    if (dueDate) {
+      const dueDateClass = dueDateStatus ? `due-date ${dueDateStatus}` : "due-date"
+      const dueDateIcon = dueDateStatus === "overdue" ? "🚨" : dueDateStatus === "today" ? "📅" : "⏰"
+      dueDateHTML = `<div class="${dueDateClass}">${dueDateIcon} Due: ${dueDate}</div>`
+    }
+
     return `
-      <div class="task-card ${completedClass}" data-task-id="${task.taskId}">
+      <div class="task-card ${completedClass} ${overdueClass}" data-task-id="${task.taskId}">
         <div class="priority-indicator ${priorityClass}"></div>
         <div class="task-header">
           <h3 class="task-title">${this.escapeHTML(task.title)}</h3>
@@ -637,7 +822,10 @@ class UIController {
             <span class="priority-badge ${priorityClass}">${task.priority}</span>
             <span class="category-badge ${categoryClass}">${task.category}</span>
           </div>
-          <span class="task-date">${task.getFormattedDate()}</span>
+          <div class="task-dates">
+            ${dueDateHTML}
+            <div class="created-date">Created: ${createdDate}</div>
+          </div>
         </div>
         <div class="task-actions">
           <button class="action-btn complete-btn" onclick="ui.handleTaskAction('complete', '${task.taskId}')" 
@@ -683,15 +871,32 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Add sample data if no tasks exist (without notifications for initial load)
   if (taskManagementSystem.taskCollection.length === 0) {
+    // Comment out or remove all the sample task creation code below
+    /*
+    const today = new Date()
+    const todayString = today.toISOString().split("T")[0]
+
+    // Create a task due tomorrow
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const tomorrowString = tomorrow.toISOString().split("T")[0]
+
+    // Create an overdue task (yesterday)
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
+    const yesterdayString = yesterday.toISOString().split("T")[0]
+
     taskManagementSystem.createNewTask(
       {
         title: "Welcome to TaskFlow!",
         description: "This is your first task. You can edit, complete, or delete it to get started.",
         priority: "medium",
         category: "personal",
+        dueDate: tomorrowString,
+        dueTime: "14:00",
       },
       false,
-    ) // Don't show notifications for sample data
+    )
 
     taskManagementSystem.createNewTask(
       {
@@ -699,9 +904,23 @@ document.addEventListener("DOMContentLoaded", () => {
         description: "Analyze Q3 performance metrics and prepare summary for stakeholders",
         priority: "high",
         category: "work",
+        dueDate: todayString,
+        dueTime: "17:00",
       },
       false,
-    ) // Don't show notifications for sample data
+    )
+
+    taskManagementSystem.createNewTask(
+      {
+        title: "Submit expense report",
+        description: "Upload receipts and submit monthly expense report to HR",
+        priority: "high",
+        category: "work",
+        dueDate: yesterdayString,
+        dueTime: "12:00",
+      },
+      false,
+    )
 
     taskManagementSystem.createNewTask(
       {
@@ -709,9 +928,12 @@ document.addEventListener("DOMContentLoaded", () => {
         description: "Research local events and make reservations",
         priority: "low",
         category: "personal",
+        dueDate: null,
+        dueTime: null,
       },
       false,
-    ) // Don't show notifications for sample data
+    )
+    */
 
     ui.refreshDisplay()
   }
@@ -719,7 +941,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Show a welcome notification after everything loads
   setTimeout(() => {
     taskManagementSystem.displayAlert(
-      "Welcome to TaskFlow! Try creating a high-priority task to see notifications in action.",
+      "Welcome to TaskFlow! Your tasks now support due dates and overdue notifications.",
       "info",
     )
   }, 1000)

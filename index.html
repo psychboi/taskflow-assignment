@@ -34,6 +34,10 @@
                     <span class="stat-value" id="doneCount">0</span>
                     <span class="stat-label">Done</span>
                 </div>
+                <div class="stat-card overdue">
+                    <span class="stat-value" id="overdueCount">0</span>
+                    <span class="stat-label">Overdue</span>
+                </div>
             </div>
 
             <!-- Category Filter -->
@@ -65,6 +69,7 @@
                     <button class="status-btn active" data-status="all">All</button>
                     <button class="status-btn" data-status="pending">Pending</button>
                     <button class="status-btn" data-status="completed">Completed</button>
+                    <button class="status-btn" data-status="overdue">Overdue</button>
                 </div>
             </div>
         </aside>
@@ -127,6 +132,18 @@
                             </div>
                         </div>
 
+                        <div class="form-row">
+                            <div class="input-group">
+                                <label for="taskDueDate">Due Date</label>
+                                <input type="date" id="taskDueDate" name="dueDate" class="date-input">
+                            </div>
+
+                            <div class="input-group">
+                                <label for="taskDueTime">Due Time (Optional)</label>
+                                <input type="time" id="taskDueTime" name="dueTime" class="time-input">
+                            </div>
+                        </div>
+
                         <div class="form-actions">
                             <button type="submit" id="submitTaskBtn" class="submit-btn">Create Task</button>
                             <button type="button" id="cancelFormBtn" class="cancel-btn">Cancel</button>
@@ -142,6 +159,7 @@
                     <div class="view-options">
                         <button class="sort-btn" id="sortByPriority">Sort by Priority</button>
                         <button class="sort-btn" id="sortByDate">Sort by Date</button>
+                        <button class="sort-btn" id="sortByDueDate">Sort by Due Date</button>
                     </div>
                 </div>
                 <div id="tasksGrid" class="tasks-grid">
