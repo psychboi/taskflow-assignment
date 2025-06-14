@@ -59,18 +59,21 @@ class TaskManagementSystem {
     this.initializeFromStorage()
   }
 
-  createNewTask(taskData) {
+  createNewTask(taskData, showNotification = true) {
     const newTask = new TaskEntity(taskData.title, taskData.description, taskData.priority, taskData.category)
 
     this.taskCollection.push(newTask)
     this.persistToStorage()
-    this.displayAlert(`Task "${newTask.title}" created successfully!`, "success")
 
-    // High priority notification
-    if (newTask.priority === "high") {
-      setTimeout(() => {
-        this.displayAlert(`⚠️ High priority task "${newTask.title}" needs attention!`, "warning")
-      }, 1500)
+    if (showNotification) {
+      this.displayAlert(`Task "${newTask.title}" created successfully!`, "success")
+
+      // High priority notification with delay
+      if (newTask.priority === "high") {
+        setTimeout(() => {
+          this.displayAlert(`⚠️ High priority task "${newTask.title}" needs attention!`, "warning")
+        }, 1500)
+      }
     }
 
     return newTask
@@ -89,6 +92,13 @@ class TaskManagementSystem {
         setTimeout(() => {
           this.displayAlert(`🔥 Task "${targetTask.title}" is now high priority!`, "warning")
         }, 1500)
+      }
+
+      // Show notification if task was updated to high priority
+      if (targetTask.priority === "high" && previousPriority !== "high") {
+        setTimeout(() => {
+          this.displayAlert(`⚠️ High priority task "${targetTask.title}" requires immediate attention!`, "error")
+        }, 2500)
       }
 
       return targetTask
@@ -111,17 +121,30 @@ class TaskManagementSystem {
   toggleTaskCompletion(taskId) {
     const targetTask = this.findTaskById(taskId)
     if (targetTask) {
+      const wasCompleted = targetTask.isCompleted
       targetTask.toggleCompletionStatus()
       this.persistToStorage()
 
-      const statusMessage = targetTask.isCompleted ? "completed" : "reactivated"
-      this.displayAlert(`Task "${targetTask.title}" ${statusMessage}!`, "success")
+      if (targetTask.isCompleted) {
+        // Task completed
+        this.displayAlert(`Task "${targetTask.title}" completed!`, "success")
 
-      // High priority completion celebration
-      if (targetTask.isCompleted && targetTask.priority === "high") {
-        setTimeout(() => {
-          this.displayAlert(`🎉 High priority task "${targetTask.title}" completed! Excellent work!`, "success")
-        }, 1500)
+        // High priority completion celebration
+        if (targetTask.priority === "high") {
+          setTimeout(() => {
+            this.displayAlert(`🎉 High priority task "${targetTask.title}" completed! Excellent work!`, "success")
+          }, 1500)
+        }
+      } else {
+        // Task reactivated
+        this.displayAlert(`Task "${targetTask.title}" reactivated!`, "info")
+
+        // Show high priority alert if reactivating a high priority task
+        if (targetTask.priority === "high") {
+          setTimeout(() => {
+            this.displayAlert(`⚠️ High priority task "${targetTask.title}" is now active again!`, "warning")
+          }, 1500)
+        }
       }
 
       return targetTask
@@ -243,9 +266,29 @@ class TaskManagementSystem {
 
     // Remove alert after 4 seconds
     setTimeout(() => {
-      alertElement.classList.remove("show")
-      setTimeout(() => alertContainer.removeChild(alertElement), 300)
+      if (alertElement.parentNode) {
+        alertElement.classList.remove("show")
+        setTimeout(() => {
+          if (alertElement.parentNode) {
+            alertContainer.removeChild(alertElement)
+          }
+        }, 300)
+      }
     }, 4000)
+  }
+
+  // Method to test notifications manually
+  testNotifications() {
+    this.displayAlert("This is a test success notification!", "success")
+    setTimeout(() => {
+      this.displayAlert("This is a test warning notification!", "warning")
+    }, 1000)
+    setTimeout(() => {
+      this.displayAlert("This is a test error notification!", "error")
+    }, 2000)
+    setTimeout(() => {
+      this.displayAlert("This is a test info notification!", "info")
+    }, 3000)
   }
 }
 
@@ -333,6 +376,14 @@ class UIController {
         this.closeTaskForm()
       }
     })
+
+    // Add keyboard shortcut for testing notifications (Ctrl+Shift+T)
+    document.addEventListener("keydown", (e) => {
+      if (e.ctrlKey && e.shiftKey && e.key === "T") {
+        e.preventDefault()
+        this.taskSystem.testNotifications()
+      }
+    })
   }
 
   handleFormSubmission(event) {
@@ -356,7 +407,7 @@ class UIController {
       this.taskSystem.currentEditingId = null
     } else {
       // Create new task
-      this.taskSystem.createNewTask(taskData)
+      this.taskSystem.createNewTask(taskData, true) // Always show notifications for user actions
     }
 
     this.closeTaskForm()
@@ -630,29 +681,46 @@ document.addEventListener("DOMContentLoaded", () => {
   // Make UI controller globally accessible for onclick handlers
   window.ui = ui
 
-  // Add sample data if no tasks exist
+  // Add sample data if no tasks exist (without notifications for initial load)
   if (taskManagementSystem.taskCollection.length === 0) {
-    taskManagementSystem.createNewTask({
-      title: "Welcome to TaskFlow!",
-      description: "This is your first task. You can edit, complete, or delete it to get started.",
-      priority: "medium",
-      category: "personal",
-    })
+    taskManagementSystem.createNewTask(
+      {
+        title: "Welcome to TaskFlow!",
+        description: "This is your first task. You can edit, complete, or delete it to get started.",
+        priority: "medium",
+        category: "personal",
+      },
+      false,
+    ) // Don't show notifications for sample data
 
-    taskManagementSystem.createNewTask({
-      title: "Review quarterly reports",
-      description: "Analyze Q3 performance metrics and prepare summary for stakeholders",
-      priority: "high",
-      category: "work",
-    })
+    taskManagementSystem.createNewTask(
+      {
+        title: "Review quarterly reports",
+        description: "Analyze Q3 performance metrics and prepare summary for stakeholders",
+        priority: "high",
+        category: "work",
+      },
+      false,
+    ) // Don't show notifications for sample data
 
-    taskManagementSystem.createNewTask({
-      title: "Plan weekend activities",
-      description: "Research local events and make reservations",
-      priority: "low",
-      category: "personal",
-    })
+    taskManagementSystem.createNewTask(
+      {
+        title: "Plan weekend activities",
+        description: "Research local events and make reservations",
+        priority: "low",
+        category: "personal",
+      },
+      false,
+    ) // Don't show notifications for sample data
 
     ui.refreshDisplay()
   }
+
+  // Show a welcome notification after everything loads
+  setTimeout(() => {
+    taskManagementSystem.displayAlert(
+      "Welcome to TaskFlow! Try creating a high-priority task to see notifications in action.",
+      "info",
+    )
+  }, 1000)
 })
