@@ -655,20 +655,25 @@ class UIController {
       // Edit mode
       const task = this.taskSystem.findTaskById(taskId)
       if (task) {
+        this.resetForm() // Clear form first
         this.populateFormForEdit(task)
         this.taskSystem.currentEditingId = taskId
         this.formHeading.textContent = "Edit Task"
         this.submitButton.textContent = "Update Task"
       }
     } else {
-      // Create mode
+      // Create mode - ensure completely clean form
       this.resetForm()
       this.formHeading.textContent = "Create New Task"
       this.submitButton.textContent = "Create Task"
     }
 
     this.formContainer.classList.add("active")
-    this.titleField.focus()
+
+    // Focus title field after a brief delay to ensure form is ready
+    setTimeout(() => {
+      this.titleField.focus()
+    }, 150)
   }
 
   populateFormForEdit(task) {
@@ -683,11 +688,25 @@ class UIController {
   closeTaskForm() {
     this.formContainer.classList.remove("active")
     this.taskSystem.currentEditingId = null
-    this.resetForm()
+
+    // Add a small delay to ensure form clears properly
+    setTimeout(() => {
+      this.resetForm()
+    }, 100)
   }
 
   resetForm() {
     this.taskForm.reset()
+
+    // Explicitly clear all form fields to prevent caching issues
+    this.titleField.value = ""
+    this.descriptionField.value = ""
+    this.priorityField.value = "medium"
+    this.categoryField.value = "personal"
+    this.dueDateField.value = ""
+    this.dueTimeField.value = ""
+
+    // Clear validation messages and styling
     this.titleValidation.textContent = ""
     this.titleField.style.borderColor = "var(--border-color)"
   }
