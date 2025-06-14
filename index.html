@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TaskFlow - Advanced Task Manager</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1 class="app-title">
+                    <span class="app-icon">📋</span>
+                    TaskFlow
+                </h1>
+                <button class="theme-switcher" id="themeSwitcher" aria-label="Toggle Theme">
+                    <span class="theme-icon">🌙</span>
+                </button>
+            </div>
+
+            <!-- Quick Stats -->
+            <div class="stats-panel">
+                <div class="stat-card">
+                    <span class="stat-value" id="totalCount">0</span>
+                    <span class="stat-label">Total</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value" id="activeCount">0</span>
+                    <span class="stat-label">Active</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value" id="doneCount">0</span>
+                    <span class="stat-label">Done</span>
+                </div>
+            </div>
+
+            <!-- Category Filter -->
+            <div class="filter-section">
+                <h3>Categories</h3>
+                <div class="category-filters">
+                    <button class="filter-btn active" data-category="all">All Tasks</button>
+                    <button class="filter-btn" data-category="personal">Personal</button>
+                    <button class="filter-btn" data-category="work">Work</button>
+                    <button class="filter-btn" data-category="urgent">Urgent</button>
+                </div>
+            </div>
+
+            <!-- Priority Filter -->
+            <div class="filter-section">
+                <h3>Priority</h3>
+                <div class="priority-filters">
+                    <button class="priority-btn active" data-priority="all">All</button>
+                    <button class="priority-btn high" data-priority="high">High</button>
+                    <button class="priority-btn medium" data-priority="medium">Medium</button>
+                    <button class="priority-btn low" data-priority="low">Low</button>
+                </div>
+            </div>
+
+            <!-- Status Filter -->
+            <div class="filter-section">
+                <h3>Status</h3>
+                <div class="status-filters">
+                    <button class="status-btn active" data-status="all">All</button>
+                    <button class="status-btn" data-status="pending">Pending</button>
+                    <button class="status-btn" data-status="completed">Completed</button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Top Bar -->
+            <header class="top-bar">
+                <div class="search-container">
+                    <input type="text" id="searchField" placeholder="Search tasks..." class="search-input">
+                    <span class="search-icon">🔍</span>
+                </div>
+                <div class="action-buttons">
+                    <button id="addTaskBtn" class="primary-btn">
+                        <span>+</span> New Task
+                    </button>
+                    <button id="clearCompletedBtn" class="secondary-btn">Clear Done</button>
+                </div>
+            </header>
+
+            <!-- Alert System -->
+            <div id="alertContainer" class="alert-container"></div>
+
+            <!-- Task Creation Form -->
+            <section class="task-form-container" id="taskFormContainer">
+                <div class="form-card">
+                    <div class="form-header">
+                        <h2 id="formHeading">Create New Task</h2>
+                        <button id="closeFormBtn" class="close-btn">&times;</button>
+                    </div>
+                    <form id="taskCreationForm" class="task-form">
+                        <div class="input-group">
+                            <label for="taskTitle">Task Title *</label>
+                            <input type="text" id="taskTitle" name="title" required>
+                            <div class="validation-message" id="titleValidation"></div>
+                        </div>
+
+                        <div class="input-group">
+                            <label for="taskDescription">Description</label>
+                            <textarea id="taskDescription" name="description" rows="4" placeholder="Add task details..."></textarea>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="input-group">
+                                <label for="taskPriority">Priority Level</label>
+                                <select id="taskPriority" name="priority">
+                                    <option value="low">Low Priority</option>
+                                    <option value="medium" selected>Medium Priority</option>
+                                    <option value="high">High Priority</option>
+                                </select>
+                            </div>
+
+                            <div class="input-group">
+                                <label for="taskCategory">Category</label>
+                                <select id="taskCategory" name="category">
+                                    <option value="personal">Personal</option>
+                                    <option value="work">Work</option>
+                                    <option value="urgent">Urgent</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" id="submitTaskBtn" class="submit-btn">Create Task</button>
+                            <button type="button" id="cancelFormBtn" class="cancel-btn">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Task Display Area -->
+            <section class="tasks-section">
+                <div class="section-header">
+                    <h2 id="sectionTitle">All Tasks</h2>
+                    <div class="view-options">
+                        <button class="sort-btn" id="sortByPriority">Sort by Priority</button>
+                        <button class="sort-btn" id="sortByDate">Sort by Date</button>
+                    </div>
+                </div>
+                <div id="tasksGrid" class="tasks-grid">
+                    <div class="empty-message">
+                        <div class="empty-icon">📝</div>
+                        <h3>No tasks found</h3>
+                        <p>Create your first task to get started!</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
