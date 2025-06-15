@@ -48,11 +48,8 @@ class TaskEntity {
   getFormattedDueDate() {
     if (!this.dueDate) return null
 
-    const dueDateTime = new Date(this.dueDate)
-    if (this.dueTime) {
-      const [hours, minutes] = this.dueTime.split(":")
-      dueDateTime.setHours(Number.parseInt(hours), Number.parseInt(minutes))
-    }
+    const dueDateTime = this.getDueDateObject()
+    if (!dueDateTime) return null
 
     return dueDateTime.toLocaleDateString("en-US", {
       month: "short",
@@ -68,12 +65,19 @@ class TaskEntity {
   getDueDateObject() {
     if (!this.dueDate) return null
 
-    const dueDateTime = new Date(this.dueDate)
+    // Fix timezone issue by creating date in local timezone
+    const dateParts = this.dueDate.split("-")
+    const year = Number.parseInt(dateParts[0])
+    const month = Number.parseInt(dateParts[1]) - 1 // Month is 0-indexed
+    const day = Number.parseInt(dateParts[2])
+
+    const dueDateTime = new Date(year, month, day)
+
     if (this.dueTime) {
       const [hours, minutes] = this.dueTime.split(":")
-      dueDateTime.setHours(Number.parseInt(hours), Number.parseInt(minutes))
+      dueDateTime.setHours(Number.parseInt(hours), Number.parseInt(minutes), 0, 0)
     } else {
-      dueDateTime.setHours(23, 59, 59) // End of day if no time specified
+      dueDateTime.setHours(23, 59, 59, 999) // End of day if no time specified
     }
 
     return dueDateTime
@@ -651,11 +655,17 @@ class UIController {
   }
 
   openTaskForm(taskId = null) {
+    // Force clear form BEFORE doing anything else
+    this.taskForm.reset()
+    this.dueDateField.value = ""
+    this.dueTimeField.value = ""
+    this.dueDateField.removeAttribute("value")
+    this.dueTimeField.removeAttribute("value")
+
     if (taskId) {
       // Edit mode
       const task = this.taskSystem.findTaskById(taskId)
       if (task) {
-        this.resetForm() // Clear form first
         this.populateFormForEdit(task)
         this.taskSystem.currentEditingId = taskId
         this.formHeading.textContent = "Edit Task"
@@ -673,6 +683,9 @@ class UIController {
     // Focus title field after a brief delay to ensure form is ready
     setTimeout(() => {
       this.titleField.focus()
+      // Double-check the date fields are empty
+      console.log("After opening form - Due date:", this.dueDateField.value)
+      console.log("After opening form - Due time:", this.dueTimeField.value)
     }, 150)
   }
 
@@ -696,19 +709,37 @@ class UIController {
   }
 
   resetForm() {
+    // Force form reset multiple ways
     this.taskForm.reset()
 
-    // Explicitly clear all form fields to prevent caching issues
-    this.titleField.value = ""
-    this.descriptionField.value = ""
-    this.priorityField.value = "medium"
-    this.categoryField.value = "personal"
-    this.dueDateField.value = ""
-    this.dueTimeField.value = ""
+    // Explicitly clear each field with multiple methods
+    const fields = [
+      { element: this.titleField, defaultValue: "" },
+      { element: this.descriptionField, defaultValue: "" },
+      { element: this.priorityField, defaultValue: "medium" },
+      { element: this.categoryField, defaultValue: "personal" },
+      { element: this.dueDateField, defaultValue: "" },
+      { element: this.dueTimeField, defaultValue: "" },
+    ]
+
+    fields.forEach((field) => {
+      field.element.value = field.defaultValue
+      field.element.defaultValue = field.defaultValue
+
+      // Force DOM update
+      field.element.setAttribute("value", field.defaultValue)
+
+      // Trigger change event to ensure any listeners are notified
+      field.element.dispatchEvent(new Event("change", { bubbles: true }))
+    })
 
     // Clear validation messages and styling
     this.titleValidation.textContent = ""
     this.titleField.style.borderColor = "var(--border-color)"
+
+    // Debug logging - remove this after testing
+    console.log("Form reset - Due date value:", this.dueDateField.value)
+    console.log("Form reset - Due time value:", this.dueTimeField.value)
   }
 
   handleTaskAction(action, taskId) {
